@@ -7,8 +7,49 @@
 </head>
 
 <body>
-	<canvas id="main-canvas" width="1200" height="600"></canvas>
-	<script src="script.js"></script>
+
+<script id="vs-basic" type="x-shader/x-vertex">
+	varying vec2 vUv;
+	void main()
+	{
+		vUv = uv;
+		gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+	}
+</script>
+
+<script id="fs-fence" type="x-shader/x-vertex">
+	uniform float lineWidth;
+	uniform float frequency;
+	uniform float scale;
+	uniform float falloff;
+	uniform float offsetU;
+	uniform float offsetV;
+
+	varying vec2 vUv;
+	
+	float round(float f)
+	{
+		return floor(f + 0.5);
+	}
+
+	void main()
+	{
+		float ut = (vUv.x + offsetU) * scale / frequency;
+		float vt = (vUv.y + offsetV) * scale / frequency;
+		float alphaU = smoothstep(0.0, falloff, lineWidth - abs(round(ut) - ut));
+		float alphaV = smoothstep(0.0, falloff, lineWidth - abs(round(vt) - vt));
+		float alpha = max(alphaU, alphaV);
+		gl_FragColor = vec4(0, 0, 0, alpha);
+	}
+
+
+</script>
+
+<canvas id="main-canvas" width="1200" height="600"></canvas>
+<script src="script.js">
+
+</script>
+
 </body>
 
 </html>

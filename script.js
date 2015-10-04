@@ -98,11 +98,13 @@
 		var result = [];
 		for (var i = 0; i < ints.length; ++i) {
 			var value = ints[i];
-			var box = new THREE.Mesh(geometry, options.material);
 			var extraHeight = 5 * (value - 1) / (options.count - 1);
+			var yScale = 1 + extraHeight;
+			var material = options.materialFactory(yScale);
+			var box = new THREE.Mesh(geometry, material);
 			box.position.x = x;
 			box.position.y = extraHeight / 4;
-			box.scale.y = 1 + extraHeight;
+			box.scale.y = yScale;
 			scene.add(box);
 			x += options.offset + boxSize;
 			result.push({
@@ -112,6 +114,23 @@
 		}
 
 		return result;
+	}
+
+	function getObjectMaterial(objYScale) {
+		var material = new THREE.ShaderMaterial({
+			uniforms: {
+				lineWidth: { type: "f", value: 0.1 },
+				frequency: { type: "f", value: 0.5 },
+				scale: { type: "f", value: objYScale },
+				falloff: { type: "f", value: 0.1 },
+				offsetU: { type: "f", value: 0 },
+				offsetV: { type: "f", value: 0 }
+			},
+			vertexShader: document.getElementById("vs-basic").textContent,
+			fragmentShader: document.getElementById("fs-fence").textContent
+		});
+		material.transparent = true;
+		return material;
 	}
 
 	function init() {
@@ -125,15 +144,11 @@
 		camera.position.z = 5;
 		camera.lookAt(new THREE.Vector3(0, 1, 0));
 
-		var light = new THREE.PointLight(0xffffff, 1, 100);
-		light.position.set(5, 5, 5);
-		scene.add(light);
-
 		var options = {
 			count: 10,
 			offset: 0.8,
 			boxSize: 0.5,
-			material: new THREE.MeshLambertMaterial({ color: 0xaaff00 })
+			materialFactory: getObjectMaterial
 		};
 		var seq = getObjectSequence(options);
 		commands = bubbleSort(seq);
