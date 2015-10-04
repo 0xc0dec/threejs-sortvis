@@ -1,0 +1,14 @@
+*_ReSharper*
+*.pdb
+*.sdf
+*.opensdf
+*.suo
+*.log
+*.tlog
+*.ilk
+*.idb
+.vs
+build*
+*DS_Store*
+*DotSettings.user
+.idea*
