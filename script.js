@@ -19,6 +19,7 @@
 	function RotatingAnimator(first, second) {
 		this.done = false;
 
+		var rotationSpeed = 10;
 		var firstObj = first.obj;
 		var secondObj = second.obj;
 		var totalAngle = 0;
@@ -34,7 +35,7 @@
 			if (this.done)
 				return;
 
-			var angle = dt * 10;
+			var angle = dt * rotationSpeed;
 			
 			if (totalAngle + angle >= Math.PI) {
 				angle = Math.PI - totalAngle;
@@ -56,6 +57,7 @@
 	function RebuildingAnimator(first, second) {
 		this.done = false;
 
+		var interval = 0.1;
 		var source = first.value >= second.value ? first.obj : second.obj;
 		var target = source === first.obj ? second.obj : first.obj;
 		var diff = Math.abs(first.value - second.value);
@@ -65,14 +67,18 @@
 			if (this.done)
 				return;
 			time += dt;
-			if (time >= 0.5) {
+			if (time >= interval) {
 				var lastBox = source.others.splice(-1, 1)[0];
 				source.remove(lastBox);
 				target.add(lastBox);
 				target.others.push(lastBox);
 				lastBox.position.y = target.others.length * objectSize;
-				if (--diff <= 0)
+				if (--diff <= 0) {
 					this.done = true;
+					var tmp = first.obj;
+					first.obj = second.obj;
+					second.obj = tmp;
+				}
 				time = 0;
 			}
 		}
