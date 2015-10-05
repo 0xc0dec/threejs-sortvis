@@ -1,11 +1,17 @@
-(function (canvasId, vsId, fsId) {
+(function (canvasContainerId, vsId, fsId) {
 	var scene = new THREE.Scene();
 	var anim = null;
 	var camera = null;
+	var cameraPivot = null;
 	var renderer = null;
 	var clock = new THREE.Clock(true);
 	var commands = null;
 	var animStarted = false;
+	var cameraOrbit = false;
+	var orbitSensitivity = 0.01;
+	var orbitSpeed = 10;
+	var cameraOrbitTargetAngle = 0;
+	var lastMouseX = 0, lastMouseY;
 
 	function RotatingAnimator(first, second) {
 		this.first = first;
@@ -64,7 +70,7 @@
 		return result;
 	}
 
-	function getRandomIntegers(count) {
+	function generateRandomIntegers(count) {
 		var used = {};
 		var values = [];
 		function tryAdjust(v) {
@@ -89,70 +95,110 @@
 		return values;
 	}
 
-	function getObjectSequence(options) {
-		var ints = getRandomIntegers(options.count);
+	function createObjects(options) {
+		var ints = generateRandomIntegers(options.count);
 		var boxSize = options.boxSize;
 		var geometry = new THREE.BoxGeometry(boxSize, boxSize, boxSize);
 		var x = -Math.floor(ints.length / 2) * (options.offset + boxSize);
 
 		var result = [];
+		var firstBox = null;
 		for (var i = 0; i < ints.length; ++i) {
 			var value = ints[i];
-//			var extraHeight = 5 * (value - 1) / (options.count - 1);
-			var scaleY = value;
-			var material = options.materialFactory(scaleY);
-			var box = new THREE.Mesh(geometry, material);
-			box.position.x = x;
-			box.position.y = scaleY / 4;
-			box.scale.y = scaleY;
-			scene.add(box);
+			var material = options.materialFactory(1);
+			for (var j = 0; j < value; ++j) {
+				var box = new THREE.Mesh(geometry, material);
+				box.position.y = j * boxSize;
+				if (firstBox)
+					firstBox.add(box);
+				else {
+					firstBox = box;
+					firstBox.position.x = x;
+				}
+			}
+			scene.add(firstBox);
 			x += options.offset + boxSize;
-			result.push({
-				obj: box,
-				value: value
-			});
+			result.push({ obj: firstBox, value: value });
+			firstBox = null;
 		}
 
 		return result;
 	}
 
-	function getObjectMaterial(objYScale) {
+	function createObjectMaterial(objYScale) {
 		var material = new THREE.ShaderMaterial({
 			uniforms: {
-				lineWidth: { type: "f", value: 0.1 },
+				lineWidth: { type: "f", value: 0.08 },
+				primaryColor: { type: "c", value: new THREE.Color(1, 1, 1) },
+				lineColor: { type: "c", value: new THREE.Color(0, 0.5, 0.5) },
 				frequency: { type: "f", value: 0.5 },
-				scaleU: { type: "f", value: 1 },
-				scaleV: { type: "f", value: objYScale },
-				falloff: { type: "f", value: 0.1 },
+				scaleU: { type: "f", value: 0.5 },
+				scaleV: { type: "f", value: objYScale / 2 },
+				falloff: { type: "f", value: 0.03 },
 				offsetU: { type: "f", value: 0 },
 				offsetV: { type: "f", value: 0 }
 			},
 			vertexShader: document.getElementById(vsId).textContent,
 			fragmentShader: document.getElementById(fsId).textContent
 		});
-		material.transparent = true;
 		return material;
 	}
 
-	function init() {
-		var canvas = document.getElementById(canvasId);
-		renderer = new THREE.WebGLRenderer({ antialias: true, canvas: canvas });
-		renderer.setSize(canvas.width, canvas.height);
-		renderer.setClearColor(0xffffff);
+	function updateCameraProjection() {
+		camera.aspect = window.innerWidth / window.innerHeight;
+		camera.updateProjectionMatrix();
+	}
 
-		camera = new THREE.PerspectiveCamera(75, canvas.width / canvas.height, 0.1, 1000);
-		camera.position.y = 2;
-		camera.position.z = 5;
-		camera.lookAt(new THREE.Vector3(0, 1, 0));
+	function init() {
+		renderer = new THREE.WebGLRenderer({ antialias: true });
+		renderer.setPixelRatio(window.devicePixelRatio);
+		renderer.setSize(window.innerWidth, window.innerHeight);
+		renderer.setClearColor(0xffffff);
+		var canvas = renderer.domElement;
+		document.getElementById(canvasContainerId).appendChild(canvas);
+
+		camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+		camera.position.y = 5;
+		camera.position.z = 7;
+		camera.lookAt(new THREE.Vector3(0, 0, 0));
+		updateCameraProjection();
+
+		cameraPivot = new THREE.Object3D();
+		cameraPivot.position.x = -0.5;
+		cameraPivot.position.y = 1;
+		cameraPivot.add(camera);
+		scene.add(cameraPivot);
 
 		var options = {
 			count: 10,
-			offset: 0.8,
+			offset: 0.5,
 			boxSize: 0.5,
-			materialFactory: getObjectMaterial
+			materialFactory: createObjectMaterial
 		};
-		var seq = getObjectSequence(options);
+		var seq = createObjects(options);
 		commands = bubbleSort(seq);
+
+		canvas.addEventListener("mousemove", function (evt) {
+			if (!cameraOrbit)
+				return;
+			cameraOrbitTargetAngle += orbitSensitivity * (lastMouseX - evt.x);
+			lastMouseX = evt.x;
+			lastMouseY = evt.y;
+		});
+
+		canvas.addEventListener("mousedown", function (evt) {
+			cameraOrbit = true;
+			lastMouseX = evt.x;
+			lastMouseY = evt.y;
+		});
+
+		canvas.addEventListener("mouseup", function (evt) {
+			cameraOrbit = false;
+		});
+
+		canvas.addEventListener("blur", function(evt) {
+			cameraOrbit = false;
+		});
 	}
 
 	function processCommand(cmd) {
@@ -168,6 +214,8 @@
 
 		if (anim)
 			anim.animate(dt);
+
+		cameraPivot.rotation.y += orbitSpeed * dt * (cameraOrbitTargetAngle - cameraPivot.rotation.y);
 
 		renderer.render(scene, camera);
 
@@ -185,6 +233,11 @@
 			animStarted = true;
 	};
 
+	window.addEventListener("resize", function () {
+		renderer.setSize(window.innerWidth, window.innerHeight);
+		updateCameraProjection();
+	});
+
 	init();
 	update();
-})("main-canvas", "vs-basic", "fs-box");
+})("main-canvas-container", "vs-basic", "fs-box");

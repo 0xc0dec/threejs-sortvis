@@ -6,7 +6,7 @@
 	<script src="three.min.js"></script>
 </head>
 
-<body>
+<body style="margin: 0">
 
 <script id="vs-basic" type="x-shader/x-vertex">
 	varying vec2 vUv;
@@ -18,6 +18,8 @@
 </script>
 
 <script id="fs-box" type="x-shader/x-vertex">
+	uniform vec3 primaryColor;
+	uniform vec3 lineColor;
 	uniform float lineWidth;
 	uniform float frequency;
 	uniform float scaleU;
@@ -40,16 +42,13 @@
 		float alphaU = smoothstep(0.0, falloff, lineWidth - abs(round(ut) - ut));
 		float alphaV = smoothstep(0.0, falloff, lineWidth - abs(round(vt) - vt));
 		float alpha = max(alphaU, alphaV);
-		gl_FragColor = vec4(0, 0, 0, alpha);
+		vec3 color = (1.0 - alpha) * primaryColor + alpha * lineColor;
+		gl_FragColor = vec4(color, 1);
 	}
-
-
 </script>
-
-<canvas id="main-canvas" width="1200" height="600"></canvas>
-<script src="script.js">
-
-</script>
+	
+<div id="main-canvas-container" style="width: 100%; height: 100%"></div>
+<script src="script.js"></script>
 
 </body>
 
