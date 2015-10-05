@@ -17,10 +17,11 @@
 	}
 </script>
 
-<script id="fs-fence" type="x-shader/x-vertex">
+<script id="fs-box" type="x-shader/x-vertex">
 	uniform float lineWidth;
 	uniform float frequency;
-	uniform float scale;
+	uniform float scaleU;
+	uniform float scaleV;
 	uniform float falloff;
 	uniform float offsetU;
 	uniform float offsetV;
@@ -34,8 +35,8 @@
 
 	void main()
 	{
-		float ut = (vUv.x + offsetU) * scale / frequency;
-		float vt = (vUv.y + offsetV) * scale / frequency;
+		float ut = (vUv.x + offsetU) * scaleU / frequency;
+		float vt = (vUv.y + offsetV) * scaleV / frequency;
 		float alphaU = smoothstep(0.0, falloff, lineWidth - abs(round(ut) - ut));
 		float alphaV = smoothstep(0.0, falloff, lineWidth - abs(round(vt) - vt));
 		float alpha = max(alphaU, alphaV);

@@ -1,4 +1,4 @@
-(function () {
+(function (canvasId, vsId, fsId) {
 	var scene = new THREE.Scene();
 	var anim = null;
 	var camera = null;
@@ -98,13 +98,13 @@
 		var result = [];
 		for (var i = 0; i < ints.length; ++i) {
 			var value = ints[i];
-			var extraHeight = 5 * (value - 1) / (options.count - 1);
-			var yScale = 1 + extraHeight;
-			var material = options.materialFactory(yScale);
+//			var extraHeight = 5 * (value - 1) / (options.count - 1);
+			var scaleY = value;
+			var material = options.materialFactory(scaleY);
 			var box = new THREE.Mesh(geometry, material);
 			box.position.x = x;
-			box.position.y = extraHeight / 4;
-			box.scale.y = yScale;
+			box.position.y = scaleY / 4;
+			box.scale.y = scaleY;
 			scene.add(box);
 			x += options.offset + boxSize;
 			result.push({
@@ -121,20 +121,21 @@
 			uniforms: {
 				lineWidth: { type: "f", value: 0.1 },
 				frequency: { type: "f", value: 0.5 },
-				scale: { type: "f", value: objYScale },
+				scaleU: { type: "f", value: 1 },
+				scaleV: { type: "f", value: objYScale },
 				falloff: { type: "f", value: 0.1 },
 				offsetU: { type: "f", value: 0 },
 				offsetV: { type: "f", value: 0 }
 			},
-			vertexShader: document.getElementById("vs-basic").textContent,
-			fragmentShader: document.getElementById("fs-fence").textContent
+			vertexShader: document.getElementById(vsId).textContent,
+			fragmentShader: document.getElementById(fsId).textContent
 		});
 		material.transparent = true;
 		return material;
 	}
 
 	function init() {
-		var canvas = document.getElementById("main-canvas");
+		var canvas = document.getElementById(canvasId);
 		renderer = new THREE.WebGLRenderer({ antialias: true, canvas: canvas });
 		renderer.setSize(canvas.width, canvas.height);
 		renderer.setClearColor(0xffffff);
@@ -186,4 +187,4 @@
 
 	init();
 	update();
-})();
+})("main-canvas", "vs-basic", "fs-box");
