@@ -57,29 +57,57 @@
 	function RebuildingAnimator(first, second) {
 		this.done = false;
 
-		var interval = 0.1;
+		var duration = 0.2;
+		var maxDistance = 0.5;
+		var speed = maxDistance / duration;
 		var source = first.value >= second.value ? first.obj : second.obj;
 		var target = source === first.obj ? second.obj : first.obj;
 		var diff = Math.abs(first.value - second.value);
 		var time = 0;
+		var distance = 0;
+		var animatedBox = null;
+		var firstPhase = false;
 
 		this.animate = function (dt) {
 			if (this.done)
 				return;
-			time += dt;
-			if (time >= interval) {
-				var lastBox = source.others.splice(-1, 1)[0];
-				source.remove(lastBox);
-				target.add(lastBox);
-				target.others.push(lastBox);
-				lastBox.position.y = target.others.length * objectSize;
-				if (--diff <= 0) {
-					this.done = true;
-					var tmp = first.obj;
-					first.obj = second.obj;
-					second.obj = tmp;
-				}
+			if (!animatedBox) {
+				animatedBox = source.others.splice(-1, 1)[0];
 				time = 0;
+				firstPhase = true;
+			}
+			var delta = speed * dt;
+			if (firstPhase) {
+				if (distance + delta > maxDistance)
+					delta = maxDistance - distance;
+				animatedBox.position.y += delta;
+				animatedBox.material.uniforms.a.value = (1 - distance / maxDistance);
+				distance += delta;
+				if (distance >= maxDistance) {
+					source.remove(animatedBox);
+					target.others.push(animatedBox);
+					target.add(animatedBox);
+					animatedBox.position.y = target.others.length * objectSize + maxDistance;
+					firstPhase = false;
+					distance = maxDistance;
+					time = 0;
+				}
+			} else {
+				if (distance - delta <= 0)
+					delta = distance;
+				animatedBox.position.y -= delta;
+				animatedBox.material.uniforms.a.value = (1 - distance / maxDistance);
+				distance -= delta;
+				if (distance <= 0) {
+					animatedBox.material.uniforms.a.value = 1;
+					if (--diff <= 0) {
+						this.done = true;
+						var tmp = first.obj;
+						first.obj = second.obj;
+						second.obj = tmp;
+					} else
+						animatedBox = null;
+				}
 			}
 		}
 	}
@@ -136,8 +164,8 @@
 		var firstBox = null;
 		for (var i = 0; i < ints.length; ++i) {
 			var value = ints[i];
-			var material = materialFactory(1);
 			for (var j = 0; j < value; ++j) {
+				var material = materialFactory(1);
 				var box = new THREE.Mesh(geometry, material);
 				box.position.y = j * objectSize;
 				if (firstBox) {
@@ -162,6 +190,7 @@
 	function createObjectMaterial(objYScale) {
 		var material = new THREE.ShaderMaterial({
 			uniforms: {
+				a: { type: "f", value: 1 },
 				lineWidth: { type: "f", value: 0.08 },
 				primaryColor: { type: "c", value: new THREE.Color(1, 1, 1) },
 				lineColor: { type: "c", value: new THREE.Color(0, 0.5, 0.5) },
@@ -175,6 +204,7 @@
 			vertexShader: document.getElementById(vsId).textContent,
 			fragmentShader: document.getElementById(fsId).textContent
 		});
+		material.transparent = true;
 		return material;
 	}
 
