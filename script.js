@@ -1,4 +1,7 @@
 (function (canvasContainerId, vsId, fsId) {
+	var objectCount = 10;
+	var objectOffset = 0.5;
+	var objectSize = 0.5;
 	var scene = new THREE.Scene();
 	var anim = null;
 	var camera = null;
@@ -14,20 +17,18 @@
 	var lastMouseX = 0, lastMouseY;
 
 	function RotatingAnimator(first, second) {
-		this.first = first;
-		this.second = second;
-		this.angle = 0;
 		this.done = false;
 
+		var firstObj = first.obj;
+		var secondObj = second.obj;
+		var totalAngle = 0;
 		var pivot = new THREE.Object3D();
-		scene.add(pivot);
-		pivot.position.set(first.position.x + (second.position.x - first.position.x) / 2, 0, 0);
+		pivot.position.x = firstObj.position.x + (secondObj.position.x - firstObj.position.x) / 2;
 		pivot.updateMatrixWorld();
+		scene.add(pivot);
 
-		THREE.SceneUtils.attach(first, scene, pivot);
-		THREE.SceneUtils.attach(second, scene, pivot);
-
-		this.pivot = pivot;
+		THREE.SceneUtils.attach(firstObj, scene, pivot);
+		THREE.SceneUtils.attach(secondObj, scene, pivot);
 
 		this.animate = function (dt) {
 			if (this.done)
@@ -35,19 +36,44 @@
 
 			var angle = dt * 10;
 			
-			if (this.angle + angle >= Math.PI) {
-				angle = Math.PI - this.angle;
+			if (totalAngle + angle >= Math.PI) {
+				angle = Math.PI - totalAngle;
 				this.done = true;
 			}
 
-			this.pivot.rotateY(angle);
-			this.angle += angle;
+			pivot.rotateY(angle);
+			totalAngle += angle;
 			pivot.updateMatrixWorld();
 
 			if (this.done) {
-				THREE.SceneUtils.detach(anim.first, anim.pivot, scene);
-				THREE.SceneUtils.detach(anim.second, anim.pivot, scene);
-				scene.remove(anim.pivot);
+				THREE.SceneUtils.detach(firstObj, pivot, scene);
+				THREE.SceneUtils.detach(secondObj, pivot, scene);
+				scene.remove(pivot);
+			}
+		}
+	}
+
+	function RebuildingAnimator(first, second) {
+		this.done = false;
+
+		var source = first.value >= second.value ? first.obj : second.obj;
+		var target = source === first.obj ? second.obj : first.obj;
+		var diff = Math.abs(first.value - second.value);
+		var time = 0;
+
+		this.animate = function (dt) {
+			if (this.done)
+				return;
+			time += dt;
+			if (time >= 0.5) {
+				var lastBox = source.others.splice(-1, 1)[0];
+				source.remove(lastBox);
+				target.add(lastBox);
+				target.others.push(lastBox);
+				lastBox.position.y = target.others.length * objectSize;
+				if (--diff <= 0)
+					this.done = true;
+				time = 0;
 			}
 		}
 	}
@@ -95,29 +121,31 @@
 		return values;
 	}
 
-	function createObjects(options) {
-		var ints = generateRandomIntegers(options.count);
-		var boxSize = options.boxSize;
-		var geometry = new THREE.BoxGeometry(boxSize, boxSize, boxSize);
-		var x = -Math.floor(ints.length / 2) * (options.offset + boxSize);
+	function createObjects(materialFactory) {
+		var ints = generateRandomIntegers(objectCount);
+		var geometry = new THREE.BoxGeometry(objectSize, objectSize, objectSize);
+		var x = -Math.floor(ints.length / 2) * (objectOffset + objectSize);
 
 		var result = [];
 		var firstBox = null;
 		for (var i = 0; i < ints.length; ++i) {
 			var value = ints[i];
-			var material = options.materialFactory(1);
+			var material = materialFactory(1);
 			for (var j = 0; j < value; ++j) {
 				var box = new THREE.Mesh(geometry, material);
-				box.position.y = j * boxSize;
-				if (firstBox)
+				box.position.y = j * objectSize;
+				if (firstBox) {
 					firstBox.add(box);
+					firstBox.others.push(box);
+				}
 				else {
 					firstBox = box;
 					firstBox.position.x = x;
+					firstBox.others = [];
 				}
 			}
 			scene.add(firstBox);
-			x += options.offset + boxSize;
+			x += objectOffset + objectSize;
 			result.push({ obj: firstBox, value: value });
 			firstBox = null;
 		}
@@ -169,13 +197,7 @@
 		cameraPivot.add(camera);
 		scene.add(cameraPivot);
 
-		var options = {
-			count: 10,
-			offset: 0.5,
-			boxSize: 0.5,
-			materialFactory: createObjectMaterial
-		};
-		var seq = createObjects(options);
+		var seq = createObjects(createObjectMaterial);
 		commands = bubbleSort(seq);
 
 		canvas.addEventListener("mousemove", function (evt) {
@@ -201,12 +223,6 @@
 		});
 	}
 
-	function processCommand(cmd) {
-		var first = cmd.first.obj;
-		var second = cmd.second.obj;
-		anim = new RotatingAnimator(first, second);
-	}
-
 	function update() {
 		requestAnimationFrame(update);
 
@@ -224,7 +240,7 @@
 
 		if (animStarted && !anim && commands.length > 0) {
 			var cmd = commands.splice(0, 1)[0];
-			processCommand(cmd);
+			anim = new RebuildingAnimator(cmd.first, cmd.second); //new RotatingAnimator(cmd.first, cmd.second);
 		}
 	}
 
