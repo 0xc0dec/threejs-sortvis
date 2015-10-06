@@ -101,10 +101,10 @@
 				if (distance - delta <= 0)
 					delta = distance;
 				animatedObj.position.y -= delta;
-				animatedObj.material.uniforms.a.value = (1 - distance / maxDistance);
+				animatedObj.material.uniforms.alpha.value = (1 - distance / maxDistance);
 				distance -= delta;
 				if (distance <= 0) {
-					animatedObj.material.uniforms.a.value = 1;
+					animatedObj.material.uniforms.alpha.value = 1;
 					if (--diff <= 0) {
 						this.done = true;
 						var tmp = first.obj;
