@@ -4,11 +4,16 @@
 	var objectSize = 0.5;
 	var orbitSensitivity = 0.01;
 	var orbitSpeed = 10;
+	var activeColor = new THREE.Color(0.9, 0.9, 1);
+	var normalColor = new THREE.Color(1, 1, 1);
 
 	var canvasContainer = document.getElementById(options.canvasContainerId);
 	var animatorSelect = document.getElementById(options.animatorSelectId);
+	var speedSelect = document.getElementById(options.speedSelectId);
 	var resetButton = document.getElementById(options.resetButtonId);
 	var sortButton = document.getElementById(options.sortButtonId);
+
+	var animationSpeed = speedSelect.selectedIndex + 1;
 	
 	var scene = null;
 	var animator = null;
@@ -24,10 +29,16 @@
 	var lastMouseY = 0;
 	var animatorConstructor = null;
 
+	function setColor(obj, color) {
+		obj.material.uniforms.primaryColor.value = color;
+		for (var i = 0; i < obj.others.length; ++i)
+			obj.others[i].material.uniforms.primaryColor.value = color;
+	}
+
 	function RotatingAnimator(first, second) {
 		this.done = false;
 
-		var rotationSpeed = 10;
+		var speedMultiplier = 2;
 		var firstObj = first.obj;
 		var secondObj = second.obj;
 		var totalAngle = 0;
@@ -36,6 +47,9 @@
 		pivot.updateMatrixWorld();
 		scene.add(pivot);
 
+		setColor(firstObj, activeColor);
+		setColor(secondObj, activeColor);
+
 		THREE.SceneUtils.attach(firstObj, scene, pivot);
 		THREE.SceneUtils.attach(secondObj, scene, pivot);
 
@@ -43,7 +57,7 @@
 			if (this.done)
 				return;
 
-			var angle = dt * rotationSpeed;
+			var angle = dt * animationSpeed * speedMultiplier;
 			
 			if (totalAngle + angle >= Math.PI) {
 				angle = Math.PI - totalAngle;
@@ -58,6 +72,8 @@
 				THREE.SceneUtils.detach(firstObj, pivot, scene);
 				THREE.SceneUtils.detach(secondObj, pivot, scene);
 				scene.remove(pivot);
+				setColor(firstObj, normalColor);
+				setColor(secondObj, normalColor);
 			}
 		}
 	}
@@ -65,15 +81,17 @@
 	function RebuildingAnimator(first, second) {
 		this.done = false;
 
-		var duration = 0.2;
 		var maxDistance = 0.5;
-		var speed = maxDistance / duration;
+		var speedMultiplier = 1;
 		var source = first.value >= second.value ? first.obj : second.obj;
 		var target = source === first.obj ? second.obj : first.obj;
 		var diff = Math.abs(first.value - second.value);
 		var distance = 0;
 		var animatedObj = null;
 		var firstPhase = false;
+
+		setColor(source, activeColor);
+		setColor(target, activeColor);
 
 		this.animate = function (dt) {
 			if (this.done)
@@ -82,7 +100,7 @@
 				animatedObj = source.others.splice(-1, 1)[0];
 				firstPhase = true;
 			}
-			var delta = speed * dt;
+			var delta = animationSpeed * speedMultiplier * dt;
 			if (firstPhase) {
 				if (distance + delta > maxDistance)
 					delta = maxDistance - distance;
@@ -110,6 +128,8 @@
 						var tmp = first.obj;
 						first.obj = second.obj;
 						second.obj = tmp;
+						setColor(source, normalColor);
+						setColor(target, normalColor);
 					} else
 						animatedObj = null;
 				}
@@ -142,9 +162,9 @@
 			for (var j = 0; ; j += 1) {
 				var right = v + j;
 				var left = v - j;
-				if (right <= count && typeof used[right] == "undefined")
+				if (right <= count && !(right in used))
 					return right;
-				else if (left >= 1 && typeof used[left] == "undefined")
+				else if (left >= 1 && !(left in used))
 					return left;
 				else if (left <= 1 && right >= count)
 					return null;
@@ -197,7 +217,7 @@
 			uniforms: {
 				alpha: { type: "f", value: 1 },
 				lineWidth: { type: "f", value: 0.08 },
-				primaryColor: { type: "c", value: new THREE.Color(1, 1, 1) },
+				primaryColor: { type: "c", value: normalColor },
 				lineColor: { type: "c", value: new THREE.Color(0, 0.5, 0.5) },
 				falloff: { type: "f", value: 0.03 }
 			},
@@ -284,6 +304,10 @@
 			reset();
 		});
 
+		speedSelect.addEventListener("change", function () {
+			animationSpeed = this.selectedIndex + 1;
+		});
+
 		window.addEventListener("resize", function () {
 			renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
 			updateCameraProjection();
@@ -319,6 +343,7 @@
 	vsContainerId: "vs-basic",
 	fsContainerId: "fs-box",
 	animatorSelectId: "animator-select",
+	speedSelectId: "speed-select",
 	resetButtonId: "reset-button",
 	sortButtonId: "sort-button"
 });
