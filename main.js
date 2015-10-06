@@ -8,6 +8,7 @@
 	var normalColor = new THREE.Color(1, 1, 1);
 
 	var canvasContainer = document.getElementById(options.canvasContainerId);
+	var algoSelect = document.getElementById(options.algoSelectId);
 	var animatorSelect = document.getElementById(options.animatorSelectId);
 	var speedSelect = document.getElementById(options.speedSelectId);
 	var resetButton = document.getElementById(options.resetButtonId);
@@ -28,6 +29,43 @@
 	var lastMouseX = 0;
 	var lastMouseY = 0;
 	var animatorConstructor = null;
+	var sort = null;
+
+	function swapAndGetCommand(seq, i, j) {
+		var result = {
+			first: seq[i],
+			second: seq[j]
+		};
+		var tmp = seq[i];
+		seq[i] = seq[j];
+		seq[j] = tmp;
+		return result;
+	}
+
+	function bubbleSort(seq) {
+		var result = [];
+		for (var i = 0; i < seq.length - 1; ++i) {
+			for (var j = i + 1; j < seq.length; ++j) {
+				if (seq[j].value < seq[i].value)
+					result.push(swapAndGetCommand(seq, i, j));
+			}
+		}
+		return result;
+	}
+
+	function selectionSort(seq) {
+		var result = [];
+		for (var i = 0; i < seq.length - 1; ++i) {
+			var minElIdx = i;
+			for (var j = i + 1; j < seq.length; ++j) {
+				if (seq[j].value < seq[minElIdx].value)
+					minElIdx = j;
+			}
+			if (minElIdx !== i)
+				result.push(swapAndGetCommand(seq, i, minElIdx));
+		}
+		return result;
+	}
 
 	function setColor(obj, color) {
 		obj.material.uniforms.primaryColor.value = color;
@@ -137,24 +175,6 @@
 		}
 	}
 
-	function bubbleSort(seq) {
-		var result = [];
-		for (var i = 0; i < seq.length - 1; ++i) {
-			for (var j = i + 1; j < seq.length; ++j) {
-				if (seq[j].value < seq[i].value) {
-					result.push({
-						first: seq[i],
-						second: seq[j]
-					});
-					var tmp = seq[i];
-					seq[i] = seq[j];
-					seq[j] = tmp;
-				}
-			}
-		}
-		return result;
-	}
-
 	function generateRandomIntegers(count) {
 		var used = {};
 		var values = [];
@@ -239,7 +259,7 @@
 		animationStarted = false;
 		animator = null;
 		var seq = createObjectSequence(createObjectMaterial);
-		commands = bubbleSort(seq);
+		commands = sort(seq);
 	}
 
 	function init() {
@@ -262,6 +282,7 @@
 		cameraPivot.add(camera);
 
 		animatorConstructor = RotatingAnimator;
+		sort = bubbleSort;
 
 		reset();
 
@@ -293,6 +314,15 @@
 
 		sortButton.addEventListener("click", function () {
 			animationStarted = true;
+		});
+
+		algoSelect.addEventListener("change", function () {
+			var val = this.options[this.selectedIndex].value;
+			if (val === "Bubble")
+				sort = bubbleSort;
+			else if (val === "Selection")
+				sort = selectionSort;
+			reset();
 		});
 
 		animatorSelect.addEventListener("change", function () {
@@ -342,6 +372,7 @@
 	canvasContainerId: "main-canvas-container",
 	vsContainerId: "vs-basic",
 	fsContainerId: "fs-box",
+	algoSelectId: "algo-select",
 	animatorSelectId: "animator-select",
 	speedSelectId: "speed-select",
 	resetButtonId: "reset-button",
