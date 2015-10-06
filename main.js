@@ -1,20 +1,28 @@
-(function (canvasContainerId, vsId, fsId) {
+(function (options) {
 	var objectCount = 10;
-	var objectOffset = 0.5;
+	var columnOffset = 0.5;
 	var objectSize = 0.5;
-	var scene = new THREE.Scene();
-	var anim = null;
+	var orbitSensitivity = 0.01;
+	var orbitSpeed = 10;
+
+	var canvasContainer = document.getElementById(options.canvasContainerId);
+	var animatorSelect = document.getElementById(options.animatorSelectId);
+	var resetButton = document.getElementById(options.resetButtonId);
+	var sortButton = document.getElementById(options.sortButtonId);
+	
+	var scene = null;
+	var animator = null;
 	var camera = null;
 	var cameraPivot = null;
 	var renderer = null;
 	var clock = new THREE.Clock(true);
 	var commands = null;
-	var animStarted = false;
+	var animationStarted = false;
 	var cameraOrbit = false;
-	var orbitSensitivity = 0.01;
-	var orbitSpeed = 10;
 	var cameraOrbitTargetAngle = 0;
-	var lastMouseX = 0, lastMouseY;
+	var lastMouseX = 0;
+	var lastMouseY = 0;
+	var animatorConstructor = null;
 
 	function RotatingAnimator(first, second) {
 		this.done = false;
@@ -63,50 +71,47 @@
 		var source = first.value >= second.value ? first.obj : second.obj;
 		var target = source === first.obj ? second.obj : first.obj;
 		var diff = Math.abs(first.value - second.value);
-		var time = 0;
 		var distance = 0;
-		var animatedBox = null;
+		var animatedObj = null;
 		var firstPhase = false;
 
 		this.animate = function (dt) {
 			if (this.done)
 				return;
-			if (!animatedBox) {
-				animatedBox = source.others.splice(-1, 1)[0];
-				time = 0;
+			if (!animatedObj) {
+				animatedObj = source.others.splice(-1, 1)[0];
 				firstPhase = true;
 			}
 			var delta = speed * dt;
 			if (firstPhase) {
 				if (distance + delta > maxDistance)
 					delta = maxDistance - distance;
-				animatedBox.position.y += delta;
-				animatedBox.material.uniforms.a.value = (1 - distance / maxDistance);
+				animatedObj.position.y += delta;
+				animatedObj.material.uniforms.alpha.value = (1 - distance / maxDistance);
 				distance += delta;
 				if (distance >= maxDistance) {
-					source.remove(animatedBox);
-					target.others.push(animatedBox);
-					target.add(animatedBox);
-					animatedBox.position.y = target.others.length * objectSize + maxDistance;
+					source.remove(animatedObj);
+					target.others.push(animatedObj);
+					target.add(animatedObj);
+					animatedObj.position.y = target.others.length * objectSize + maxDistance;
 					firstPhase = false;
 					distance = maxDistance;
-					time = 0;
 				}
 			} else {
 				if (distance - delta <= 0)
 					delta = distance;
-				animatedBox.position.y -= delta;
-				animatedBox.material.uniforms.a.value = (1 - distance / maxDistance);
+				animatedObj.position.y -= delta;
+				animatedObj.material.uniforms.a.value = (1 - distance / maxDistance);
 				distance -= delta;
 				if (distance <= 0) {
-					animatedBox.material.uniforms.a.value = 1;
+					animatedObj.material.uniforms.a.value = 1;
 					if (--diff <= 0) {
 						this.done = true;
 						var tmp = first.obj;
 						first.obj = second.obj;
 						second.obj = tmp;
 					} else
-						animatedBox = null;
+						animatedObj = null;
 				}
 			}
 		}
@@ -155,17 +160,17 @@
 		return values;
 	}
 
-	function createObjects(materialFactory) {
+	function createObjectSequence(materialFactory) {
 		var ints = generateRandomIntegers(objectCount);
 		var geometry = new THREE.BoxGeometry(objectSize, objectSize, objectSize);
-		var x = -Math.floor(ints.length / 2) * (objectOffset + objectSize);
+		var x = -Math.floor(ints.length / 2) * (columnOffset + objectSize);
 
 		var result = [];
 		var firstBox = null;
 		for (var i = 0; i < ints.length; ++i) {
 			var value = ints[i];
 			for (var j = 0; j < value; ++j) {
-				var material = materialFactory(1);
+				var material = materialFactory();
 				var box = new THREE.Mesh(geometry, material);
 				box.position.y = j * objectSize;
 				if (firstBox) {
@@ -179,7 +184,7 @@
 				}
 			}
 			scene.add(firstBox);
-			x += objectOffset + objectSize;
+			x += columnOffset + objectSize;
 			result.push({ obj: firstBox, value: value });
 			firstBox = null;
 		}
@@ -187,43 +192,47 @@
 		return result;
 	}
 
-	function createObjectMaterial(objYScale) {
+	function createObjectMaterial() {
 		var material = new THREE.ShaderMaterial({
 			uniforms: {
-				a: { type: "f", value: 1 },
+				alpha: { type: "f", value: 1 },
 				lineWidth: { type: "f", value: 0.08 },
 				primaryColor: { type: "c", value: new THREE.Color(1, 1, 1) },
 				lineColor: { type: "c", value: new THREE.Color(0, 0.5, 0.5) },
-				frequency: { type: "f", value: 0.5 },
-				scaleU: { type: "f", value: 0.5 },
-				scaleV: { type: "f", value: objYScale / 2 },
-				falloff: { type: "f", value: 0.03 },
-				offsetU: { type: "f", value: 0 },
-				offsetV: { type: "f", value: 0 }
+				falloff: { type: "f", value: 0.03 }
 			},
-			vertexShader: document.getElementById(vsId).textContent,
-			fragmentShader: document.getElementById(fsId).textContent
+			vertexShader: document.getElementById(options.vsContainerId).textContent,
+			fragmentShader: document.getElementById(options.fsContainerId).textContent
 		});
 		material.transparent = true;
 		return material;
 	}
 
 	function updateCameraProjection() {
-		camera.aspect = window.innerWidth / window.innerHeight;
+		camera.aspect = canvasContainer.clientWidth / canvasContainer.clientHeight;
 		camera.updateProjectionMatrix();
+	}
+
+	function reset() {
+		scene = new THREE.Scene();
+		scene.add(cameraPivot);
+		animationStarted = false;
+		animator = null;
+		var seq = createObjectSequence(createObjectMaterial);
+		commands = bubbleSort(seq);
 	}
 
 	function init() {
 		renderer = new THREE.WebGLRenderer({ antialias: true });
 		renderer.setPixelRatio(window.devicePixelRatio);
-		renderer.setSize(window.innerWidth, window.innerHeight);
+		renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
 		renderer.setClearColor(0xffffff);
 		var canvas = renderer.domElement;
-		document.getElementById(canvasContainerId).appendChild(canvas);
+		canvasContainer.appendChild(canvas);
 
 		camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
 		camera.position.y = 5;
-		camera.position.z = 7;
+		camera.position.z = 7.5;
 		camera.lookAt(new THREE.Vector3(0, 0, 0));
 		updateCameraProjection();
 
@@ -231,10 +240,10 @@
 		cameraPivot.position.x = -0.5;
 		cameraPivot.position.y = 1;
 		cameraPivot.add(camera);
-		scene.add(cameraPivot);
 
-		var seq = createObjects(createObjectMaterial);
-		commands = bubbleSort(seq);
+		animatorConstructor = RotatingAnimator;
+
+		reset();
 
 		canvas.addEventListener("mousemove", function (evt) {
 			if (!cameraOrbit)
@@ -257,6 +266,28 @@
 		canvas.addEventListener("blur", function(evt) {
 			cameraOrbit = false;
 		});
+
+		resetButton.addEventListener("click", function() {
+			reset();
+		});
+
+		sortButton.addEventListener("click", function () {
+			animationStarted = true;
+		});
+
+		animatorSelect.addEventListener("change", function () {
+			var val = this.options[this.selectedIndex].value;
+			if (val === "Rotate")
+				animatorConstructor = RotatingAnimator;
+			else if (val === "Rebuild")
+				animatorConstructor = RebuildingAnimator;
+			reset();
+		});
+
+		window.addEventListener("resize", function () {
+			renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+			updateCameraProjection();
+		});
 	}
 
 	function update() {
@@ -264,32 +295,30 @@
 
 		var dt = clock.getDelta();
 
-		if (anim)
-			anim.animate(dt);
+		if (animator)
+			animator.animate(dt);
 
 		cameraPivot.rotation.y += orbitSpeed * dt * (cameraOrbitTargetAngle - cameraPivot.rotation.y);
 
 		renderer.render(scene, camera);
 
-		if (anim && anim.done)
-			anim = null;
+		if (animator && animator.done)
+			animator = null;
 
-		if (animStarted && !anim && commands.length > 0) {
+		if (animationStarted && !animator && commands.length > 0) {
 			var cmd = commands.splice(0, 1)[0];
-			anim = new RebuildingAnimator(cmd.first, cmd.second); //new RotatingAnimator(cmd.first, cmd.second);
+			animator = new animatorConstructor(cmd.first, cmd.second);
 		}
 	}
 
-	document.body.onkeydown = function (e) {
-		if (String.fromCharCode(e.keyCode) === "E")
-			animStarted = true;
-	};
-
-	window.addEventListener("resize", function () {
-		renderer.setSize(window.innerWidth, window.innerHeight);
-		updateCameraProjection();
-	});
-
 	init();
 	update();
-})("main-canvas-container", "vs-basic", "fs-box");
+
+})({
+	canvasContainerId: "main-canvas-container",
+	vsContainerId: "vs-basic",
+	fsContainerId: "fs-box",
+	animatorSelectId: "animator-select",
+	resetButtonId: "reset-button",
+	sortButtonId: "sort-button"
+});

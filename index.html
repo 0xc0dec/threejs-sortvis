@@ -1,57 +1,104 @@
 <html>
 
 <head>
-	<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
-
+	<link rel="stylesheet" href="bootstrap.min.css"/>
 	<script src="three.min.js"></script>
+
+	<style>
+		#main-canvas-container {
+			width: 100%;
+			height: 700px;
+			cursor: pointer;
+		}
+
+		#controls-form {
+			margin: 10px;
+		}
+	</style>
 </head>
 
-<body style="margin: 0">
+<body>
+	<script id="vs-basic" type="x-shader/x-vertex">
+		varying vec2 texCoord;
+		void main()
+		{
+			texCoord = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+		}
+	</script>
 
-<script id="vs-basic" type="x-shader/x-vertex">
-	varying vec2 vUv;
-	void main()
-	{
-		vUv = uv;
-		gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-	}
-</script>
+	<script id="fs-box" type="x-shader/x-vertex">
+		uniform float alpha;
+		uniform vec3 primaryColor;
+		uniform vec3 lineColor;
+		uniform float lineWidth;
+		uniform float falloff;
 
-<script id="fs-box" type="x-shader/x-vertex">
-	uniform float a;
-	uniform vec3 primaryColor;
-	uniform vec3 lineColor;
-	uniform float lineWidth;
-	uniform float frequency;
-	uniform float scaleU;
-	uniform float scaleV;
-	uniform float falloff;
-	uniform float offsetU;
-	uniform float offsetV;
-
-	varying vec2 vUv;
+		varying vec2 texCoord;
 	
-	float round(float f)
-	{
-		return floor(f + 0.5);
-	}
+		float round(float f)
+		{
+			return floor(f + 0.5);
+		}
 
-	void main()
-	{
-		float ut = (vUv.x + offsetU) * scaleU / frequency;
-		float vt = (vUv.y + offsetV) * scaleV / frequency;
-		float multU = smoothstep(0.0, falloff, lineWidth - abs(round(ut) - ut));
-		float multV = smoothstep(0.0, falloff, lineWidth - abs(round(vt) - vt));
-		float mult = max(multU, multV);
-		vec3 color = (1.0 - mult) * primaryColor + mult * lineColor;
-		gl_FragColor = vec4(color, a);
-	}
+		void main()
+		{
+			float multU = smoothstep(0.0, falloff, lineWidth - abs(round(texCoord.x) - texCoord.x));
+			float multV = smoothstep(0.0, falloff, lineWidth - abs(round(texCoord.y) - texCoord.y));
+			float mult = max(multU, multV);
+			vec3 color = (1.0 - mult) * primaryColor + mult * lineColor;
+			gl_FragColor = vec4(color, alpha);
+		}
 
-</script>
-	
-<div id="main-canvas-container" style="width: 100%; height: 100%"></div>
-<script src="script.js"></script>
+	</script>
 
+	<div class="container-fluid">
+		<div class="row">
+			<div class="col-sm-8 col-sm-offset-2">
+				<form class="form-horizontal">
+					<div id="controls-form" class="form-group">
+						<div class="row">
+							<div class="col-sm-3">
+								<label class="control-label">Algorithm</label>
+							</div>
+							<div class="col-sm-3">
+								<label class="control-label">Animation</label>
+							</div>
+							<div class="col-sm-2">
+								<label class="control-label"></label>
+							</div>
+						</div>
+						<div class="row">
+							<div class="col-sm-3">
+								<select class="form-control">
+									<option selected="selected">Bubble</option>
+								</select>
+							</div>
+							<div class="col-sm-3">
+								<select class="form-control" id="animator-select">
+									<option selected="selected">Rotate</option>
+									<option>Rebuild</option>
+								</select>
+							</div>
+							<div class="col-sm-2">
+								<input type="button" class="btn btn-default form-control" id="sort-button" value="Sort!" />
+							</div>
+							<div class="col-sm-2">
+								<input type="button" class="btn btn-default form-control" id="reset-button" value="Reset" />
+							</div>
+						</div>
+					</div>
+				</form>
+			</div>
+		</div>
+		<div class="row">
+			<div class="col-sm-12">
+				<div id="main-canvas-container"></div>
+			</div>
+		</div>
+	</div>
+
+	<script src="main.js"></script>
 </body>
 
 </html>
