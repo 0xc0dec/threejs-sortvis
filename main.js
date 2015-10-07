@@ -136,7 +136,7 @@
 		var secondObj = second.obj;
 		var firstObjInitialX = firstObj.position.x;
 		var secondObjInitialX = secondObj.position.x;
-		var a = (secondObj.position.x - firstObj.position.x) >= 0 ? 1 : -1;
+		var direction = (secondObj.position.x - firstObj.position.x) >= 0 ? 1 : -1;
 		var firstPhase = true;
 
 		setColor(firstObj, activeColor);
@@ -158,16 +158,16 @@
 			setAlpha(firstObj, alpha);
 			setAlpha(secondObj, alpha);
 
-			firstObj.position.x += a * delta;
-			secondObj.position.x += -a * delta;
+			firstObj.position.x += direction * delta;
+			secondObj.position.x += -direction * delta;
 
 			if (offset >= maxOffset) {
 				if (firstPhase) {
 					offset = 0;
 					setAlpha(firstObj, 0);
 					setAlpha(secondObj, 0);
-					firstObj.position.x = secondObjInitialX - a * maxOffset;
-					secondObj.position.x = firstObjInitialX + a * maxOffset;
+					firstObj.position.x = secondObjInitialX - direction * maxOffset;
+					secondObj.position.x = firstObjInitialX + direction * maxOffset;
 					firstPhase = false;
 				} else {
 					this.done = true;
