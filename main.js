@@ -31,6 +31,15 @@
 	var animatorConstructor = null;
 	var sort = null;
 
+	function setAlpha(obj, alpha) {
+		obj.material.uniforms.alpha.value = alpha;
+		var others = obj.others;
+		if (others) {
+			for (var i = 0; i < others.length; ++i)
+				setAlpha(others[i], alpha);
+		}
+	}
+
 	function swapAndGetCommand(seq, i, j) {
 		var result = {
 			first: seq[i],
@@ -116,6 +125,63 @@
 		}
 	}
 
+	function SlidingAnimator(first, second) {
+		this.done = false;
+
+		var maxOffset = 0.25;
+		var offset = 0;
+		var speedMultiplier = 0.3;
+
+		var firstObj = first.obj;
+		var secondObj = second.obj;
+		var firstObjInitialX = firstObj.position.x;
+		var secondObjInitialX = secondObj.position.x;
+		var a = (secondObj.position.x - firstObj.position.x) >= 0 ? 1 : -1;
+		var firstPhase = true;
+
+		setColor(firstObj, activeColor);
+		setColor(secondObj, activeColor);
+
+		this.animate = function (dt) {
+			if (this.done)
+				return;
+
+			var delta = dt * speedMultiplier * animationSpeed;
+			if (offset + delta >= maxOffset)
+				delta = maxOffset - offset;
+
+			offset += delta;
+
+			var alpha = 1 - offset / maxOffset;
+			if (!firstPhase)
+				alpha = 1 - alpha;
+			setAlpha(firstObj, alpha);
+			setAlpha(secondObj, alpha);
+
+			firstObj.position.x += a * delta;
+			secondObj.position.x += -a * delta;
+
+			if (offset >= maxOffset) {
+				if (firstPhase) {
+					offset = 0;
+					setAlpha(firstObj, 0);
+					setAlpha(secondObj, 0);
+					firstObj.position.x = secondObjInitialX - a * maxOffset;
+					secondObj.position.x = firstObjInitialX + a * maxOffset;
+					firstPhase = false;
+				} else {
+					this.done = true;
+					setColor(firstObj, normalColor);
+					setColor(secondObj, normalColor);
+					setAlpha(firstObj, 1);
+					setAlpha(secondObj, 1);
+					firstObj.position.x = secondObjInitialX;
+					secondObj.position.x = firstObjInitialX;
+				}
+			}
+		}
+	}
+
 	function RebuildingAnimator(first, second) {
 		this.done = false;
 
@@ -143,7 +209,7 @@
 				if (distance + delta > maxDistance)
 					delta = maxDistance - distance;
 				animatedObj.position.y += delta;
-				animatedObj.material.uniforms.alpha.value = (1 - distance / maxDistance);
+				setAlpha(animatedObj, 1 - distance / maxDistance);
 				distance += delta;
 				if (distance >= maxDistance) {
 					source.remove(animatedObj);
@@ -157,10 +223,10 @@
 				if (distance - delta <= 0)
 					delta = distance;
 				animatedObj.position.y -= delta;
-				animatedObj.material.uniforms.alpha.value = (1 - distance / maxDistance);
+				setAlpha(animatedObj, 1 - distance / maxDistance);
 				distance -= delta;
 				if (distance <= 0) {
-					animatedObj.material.uniforms.alpha.value = 1;
+					setAlpha(animatedObj, 1);
 					if (--diff <= 0) {
 						this.done = true;
 						var tmp = first.obj;
@@ -331,6 +397,8 @@
 				animatorConstructor = RotatingAnimator;
 			else if (val === "Rebuild")
 				animatorConstructor = RebuildingAnimator;
+			else if (val === "Slide")
+				animatorConstructor = SlidingAnimator;
 			reset();
 		});
 
